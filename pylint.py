@@ -150,7 +150,6 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 1):
     fig = plt.figure(nfig)
     for marcha in marchas_list:
         plt.plot(datos_sead.time, datos_sead.CIC_Marcha(marcha), '.', label = marcha)
-    plt.suptitle('Exported data from SEAD. Start time = {}'.format(datos_sead.t_inicio))
     plt.xlabel('t [min]')
     plt.ylabel('Current [A]')
     plt.legend()
