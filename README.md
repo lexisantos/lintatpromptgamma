@@ -4,4 +4,4 @@ _pylint_ es la librería con funciones útiles para analizar y graficar los dato
 
 ## Más detalles
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/tesislicfisica/lintatpromptgamma/main)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gl/tesislicfisica%2Flintatpromptgamma/main)
