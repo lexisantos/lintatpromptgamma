@@ -159,3 +159,4 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 1):
     plt.tight_layout()  
     plt.close()
     return fig
+
