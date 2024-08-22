@@ -159,3 +159,20 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 1):
     plt.close()
     return fig
 
+def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog',
+                    power_list = [], nfig = 98):
+    fig = plt.figure(nfig)
+    axs = []
+    for t, count in zip(LINT_t.values(), LINT_counts.values()):
+        ax = plt.errorbar(t, count[:, 0], yerr= count[:, 1], fmt='.')
+        axs.append(ax)
+    plt.xlabel('t [min]')
+    plt.ylabel('CPS')
+    plt.yscale(yscale)
+    if power_list!=[]:
+        plt.legend(axs, power_list)
+    plt.grid(ls='--')
+    plt.tight_layout()  
+    plt.close()
+    return fig
+
