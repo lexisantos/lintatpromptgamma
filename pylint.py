@@ -185,7 +185,7 @@ def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', nfig = 98):
     for t, count, pot in zip(LINT_t.values(), LINT_counts.values(), LINT_counts.keys()):
         ax.errorbar(t, count[:, 0], yerr= count[:, 1], fmt='.', label = pot + 'W')
     ax.set_xlabel('t [min]')
-    ax.set_label('CPS')
+    ax.set_ylabel('CPS')
     ax.set_yscale(yscale)
     ax.legend()
     ax.grid(ls='--')
