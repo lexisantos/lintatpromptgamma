@@ -5,13 +5,13 @@ Created on Thu Aug 15 15:11:17 2024
 @author: Alex
 """
 
-# import glob
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from datetime import datetime
 import copy
-# from Codigos_py.Repositorio.Activacion import redondeo, ajuste_pol
+from itertools import combinations
+from scipy.stats import chi2
 
 
 class data_sead:
@@ -179,19 +179,15 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 99):
     plt.show()
     return fig
 
-def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog',
-                    power_list = [], nfig = 98):
+def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', nfig = 98):
     fig = plt.figure(nfig)
     ax = fig.add_subplot()
-    axs_list = []
     for t, count, pot in zip(LINT_t.values(), LINT_counts.values(), LINT_counts.keys()):
         ax.errorbar(t, count[:, 0], yerr= count[:, 1], fmt='.', label = pot + 'W')
-        axs_list.append(ax)
     ax.set_xlabel('t [min]')
     ax.set_label('CPS')
     ax.set_yscale(yscale)
-    # if power_list!=[]:
-        # plt.legend(axs, power_list)
+    ax.legend()
     ax.grid(ls='--')
     fig.tight_layout()  
     fig.show()
@@ -201,3 +197,41 @@ def add_vlines(fig, ax, list_x, style = '--'):
     y0, y1 = ax.get_ylim()
     ax.vlines(list_x, ymin = y0, ymax = y1, ls = style, color = 'tab:gray')
     return fig
+
+#%% Otras herramientas
+
+def redondeo(mean, err, cs, texto = False):
+    """
+    Devuelve al valor medio con la misma cant. de decimales que el error (con 2 c.s.).
+    """
+    digits = -np.floor(np.log10(err)).astype(int)+cs-1
+    if err<1:
+        err_R = format(np.round(err, decimals = digits), f'.{digits}f')
+        mean_R = str(np.round(mean, decimals = len(err_R)-2))
+    else:
+        err_R = format(np.round(err, decimals = digits), '.0f')
+        mean_R = format(np.round(mean, decimals = cs-1-len(err_R)), '.0f')
+    if texto == True:
+        return (mean_R, '±',err_R)
+    else:
+        return (float(mean_R), float(err_R))
+
+def ajuste_pol(grado, xdata, ydata, y_err):
+    f = lambda x: np.column_stack([a*b for a, b in combinations(x, 2)])
+    matrix_fromx = lambda data: np.column_stack([data**exp for exp in np.arange(grado+1)])
+    cova_y = np.diag(y_err**2)
+    design_matrix = matrix_fromx(xdata)
+    cova_mle = np.linalg.inv(design_matrix.T @ np.linalg.inv(cova_y) @ design_matrix )
+    matrix_B = cova_mle @ design_matrix.T @ np.linalg.inv(cova_y)
+    par_est = matrix_B @ ydata
+    par_err = np.sqrt(np.diag(cova_mle))
+    comb = f(par_err) #combinatoria de stds de par_err
+    upper_tri = cova_mle[np.triu_indices_from(cova_mle, k=1)] #upper triangle from covariance matrix
+    rhos = upper_tri/comb #factores de correlación (01, 02, 03, ... 0max, 12, 13). Usa combinatoria de las stds y los elementos de la cov 
+    var_mu = lambda xfit: matrix_fromx(xfit)**2 @ np.diag(cova_mle) + 2*np.row_stack([f(x) for x in matrix_fromx(xfit)]) @ upper_tri #varianza del parámetro hallado 
+    
+    residuos = ydata - design_matrix @ par_est
+    J_min_observado = residuos.T @ np.linalg.inv(cova_y) @ residuos #chi2
+    ddof = len(xdata) - len(par_est)
+    pvalor = chi2.sf(J_min_observado, ddof) 
+    return par_est[::-1], par_err[::-1], J_min_observado, residuos, pvalor, ddof, rhos, var_mu
