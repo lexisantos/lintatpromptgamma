@@ -55,7 +55,7 @@ class data_sead:
         try:
             step_times = np.loadtxt(path_step)
         except:
-            step_times = self.select_steps(self, det)
+            step_times = self.select_steps(det)
         data_step = {}
         time_step = {}
 
@@ -185,7 +185,7 @@ def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', nfig = 98):
     for t, count, pot in zip(LINT_t.values(), LINT_counts.values(), LINT_counts.keys()):
         ax.errorbar(t, count[:, 0], yerr= count[:, 1], fmt='.', label = pot + 'W')
     ax.set_xlabel('t [min]')
-    ax.set_ylabel('CPS')
+    ax.set_label('CPS')
     ax.set_yscale(yscale)
     ax.legend()
     ax.grid(ls='--')
@@ -197,6 +197,43 @@ def add_vlines(fig, ax, list_x, style = '--'):
     y0, y1 = ax.get_ylim()
     ax.vlines(list_x, ymin = y0, ymax = y1, ls = style, color = 'tab:gray')
     return fig
+
+def figure_fit(xdata, ydata, yerror, fit_data, i_sel = [], xerror = None, show_report = True):
+    if i_sel != []:
+        i, f = i_sel
+        xdata = xdata[i:f]
+        ydata = ydata[i:f]
+        yerror = yerror[i:f]
+        try:
+            xerror = xerror[i:f]
+        except:
+            xerror = np.zeros(len(xdata))
+    x = np.linspace(np.min(xdata), np.max(xdata), 1000)
+    sigma_mu_est = np.sqrt(fit_data[-1](x))
+    yerr_eff = ydata*np.sqrt((yerror/ydata)**2 + (xerror/xdata)**2)
+    y_eval = np.polyval(fit_data[0], x)
+    
+    plt.figure()
+    plt.errorbar(xdata, ydata, yerr = yerr_eff, fmt = '.', label = 'LINT-M2')
+    plt.plot(x, y_eval, label = 'Ajuste', linewidth = 2.0)
+    plt.fill_between(x, y_eval-sigma_mu_est, y_eval+sigma_mu_est, color='tab:gray', alpha=0.2)
+    plt.legend()
+    plt.grid(ls = '--')
+    plt.xlabel('Corriente [A]')
+    plt.ylabel('Tasa de conteo [CPS]')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.tight_layout()
+    
+    if show_report:
+        report = 'Fit Report: \n'
+        for var, error, par in zip(fit_data[0], fit_data[1], ['a', 'b']):
+            report += par + " = " + ''.join(redondeo(var, error, 3, texto= True)) + ' \n'
+        report += "p-valor = " + str(fit_data[4]) + '\n'
+        report += "chi2 = " + str(fit_data[5]) + '\n'
+        report += "dof = " + str(fit_data[2]) + '\n'
+        print(report)
+    plt.show()
 
 #%% Otras herramientas
 
@@ -235,3 +272,5 @@ def ajuste_pol(grado, xdata, ydata, y_err):
     ddof = len(xdata) - len(par_est)
     pvalor = chi2.sf(J_min_observado, ddof) 
     return par_est[::-1], par_err[::-1], J_min_observado, residuos, pvalor, ddof, rhos, var_mu
+
+
