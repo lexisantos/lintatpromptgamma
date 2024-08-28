@@ -125,7 +125,7 @@ class data_LINT:
                 counts_norep[pot] = self.counts_cond[pot]
         self.time_norep  = time_norep
         self.counts_norep = counts_norep
-    
+            
     def moving_avg(self, N_vent = 10, N_sep =3):
         try:
             self.time_norep
@@ -154,8 +154,20 @@ class data_LINT:
             time_deriva[pot] = np.delete(time_deriva[pot], 0, axis=0)
             counts_deriva[pot] = np.delete(counts_deriva[pot], 0, axis=0)
         return time_deriva, counts_deriva
-
-def average_stable(time, signal, step_times):
+        
+    def stable_interval(self, path_stable):
+        stable_times = np.loadtxt(path_stable)
+        potencias = self.potencias
+        times_stable = {}
+        counts_stable = {}
+        for jj, pot in enumerate(potencias):
+            cond = np.logical_and(self.time_norep[pot]>stable_times[jj][0], self.time_norep[pot]<stable_times[jj][1])
+            counts_stable[pot] = self.counts_norep[pot][cond]
+            times_stable[pot] = self.time_norep[pot][cond]
+        self.counts_stable = counts_stable
+        self.time_stable = times_stable
+        
+def average_stable(time, signal, step_times): #agregar intervalos estables a data_LINT, para hacer análisis sobre ellos.
     potencias = signal.keys()
     counts_avg = np.zeros((len(potencias), 2))
     for jj, pot in enumerate(potencias):
@@ -163,7 +175,40 @@ def average_stable(time, signal, step_times):
         counts_avg[jj] = [np.mean(signal[pot][cond]), np.std(signal[pot][cond], ddof=1)]
     return counts_avg
 
+def sel_data(datalist, index):
+    i, f = index
+    if i<0:
+        f, i = abs(i), abs(f+1)
+        for ii, data in enumerate(datalist):
+            datalist[ii] = data[::-1][i:f][::-1]
+    else:
+        for ii, data in enumerate(datalist):
+            datalist[ii] = data[i:f]
+    return datalist    
+
 #%% Figures 
+
+def LINT_hist_step(self, pot_sel):
+    """
+    Gráfico de histograma por paso, a partir de datos corregidos
+
+    Parameters
+    ----------
+    pot_sel : list, str
+        Potencia seleccionada para hacer el histograma.
+
+    Returns
+    -------
+    Shows figures.
+
+    """
+    for pot in pot_sel:
+        plt.figure()
+        plt.hist(self.counts_stable[pot], label = pot + 'W')
+        plt.xlabel('Cuentas')
+        plt.ylabel('Frecuencia')
+        plt.legend()
+        plt.tight_layout()
 
 def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 99):
     fig = plt.figure(nfig)
@@ -179,7 +224,10 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 99):
     plt.show()
     return fig
 
-def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', nfig = 98):
+def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', power_sel = [], nfig = 98):
+    if power_sel != []:
+        LINT_t = {x: LINT_t[x] for x in power_sel}
+        LINT_counts = {x: LINT_counts[x] for x in power_sel}
     fig = plt.figure(nfig)
     ax = fig.add_subplot()
     for t, count, pot in zip(LINT_t.values(), LINT_counts.values(), LINT_counts.keys()):
@@ -198,31 +246,29 @@ def add_vlines(fig, ax, list_x, style = '--'):
     ax.vlines(list_x, ymin = y0, ymax = y1, ls = style, color = 'tab:gray')
     return fig
 
-def figure_fit(xdata, ydata, yerror, fit_data, i_sel = [], xerror = None, show_report = True):
+def figure_fit(xdata, ydata, yerror, fit_data, scale = 'log', i_sel = [], xerror = None, show_report = True):
     if i_sel != []:
-        i, f = i_sel
-        xdata = xdata[i:f]
-        ydata = ydata[i:f]
-        yerror = yerror[i:f]
-        try:
-            xerror = xerror[i:f]
-        except:
-            xerror = np.zeros(len(xdata))
+        xdata, ydata, yerror = sel_data([xdata, ydata, yerror], i_sel)
+    try:
+        xerror = xerror[i_sel[0]:i_sel[1]]
+    except:
+        xerror = np.zeros(len(xdata))
     x = np.linspace(np.min(xdata), np.max(xdata), 1000)
     sigma_mu_est = np.sqrt(fit_data[-1](x))
     yerr_eff = ydata*np.sqrt((yerror/ydata)**2 + (xerror/xdata)**2)
     y_eval = np.polyval(fit_data[0], x)
     
     plt.figure()
-    plt.errorbar(xdata, ydata, yerr = yerr_eff, fmt = '.', label = 'LINT-M2')
+    plt.errorbar(xdata, ydata, yerr = yerr_eff, fmt = '.', label = 'datos')
     plt.plot(x, y_eval, label = 'Ajuste', linewidth = 2.0)
-    plt.fill_between(x, y_eval-sigma_mu_est, y_eval+sigma_mu_est, color='tab:gray', alpha=0.2)
+    plt.fill_between(x, y_eval-sigma_mu_est, y_eval+sigma_mu_est, color='tab:orange', alpha=0.2)
     plt.legend()
     plt.grid(ls = '--')
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     plt.xlabel('Corriente [A]')
     plt.ylabel('Tasa de conteo [CPS]')
-    plt.xscale('log')
-    plt.yscale('log')
+    plt.xscale(scale)
+    plt.yscale(scale)
     plt.tight_layout()
     
     if show_report:
@@ -230,10 +276,22 @@ def figure_fit(xdata, ydata, yerror, fit_data, i_sel = [], xerror = None, show_r
         for var, error, par in zip(fit_data[0], fit_data[1], ['a', 'b']):
             report += par + " = " + ''.join(redondeo(var, error, 3, texto= True)) + ' \n'
         report += "p-valor = " + str(fit_data[4]) + '\n'
-        report += "chi2 = " + str(fit_data[5]) + '\n'
-        report += "dof = " + str(fit_data[2]) + '\n'
+        report += "chi2 = " + str(fit_data[2]) + '\n'
+        report += "dof = " + str(fit_data[5]) + '\n'
         print(report)
     plt.show()
+
+def fig_err(counts_std, counts, scale = 'log'):
+    plt.figure()
+    for count, count_std in zip(counts, counts_std):
+        plt.plot(count_std, np.sqrt(count), 'o', label = str(round(count)))
+    plt.legend()
+    plt.ylabel('$\sqrt{Counts}$')
+    plt.xlabel('$\sigma_{std}$')
+    plt.grid(ls = '--')
+    plt.xscale(scale)
+    plt.yscale(scale)
+    plt.tight_layout()
 
 #%% Otras herramientas
 
@@ -253,7 +311,9 @@ def redondeo(mean, err, cs, texto = False):
     else:
         return (float(mean_R), float(err_R))
 
-def ajuste_pol(grado, xdata, ydata, y_err):
+def ajuste_pol(grado, xdata, ydata, y_err, i_sel=[]):
+    if i_sel != []:
+        xdata, ydata, y_err = sel_data([xdata, ydata, y_err], i_sel)
     f = lambda x: np.column_stack([a*b for a, b in combinations(x, 2)])
     matrix_fromx = lambda data: np.column_stack([data**exp for exp in np.arange(grado+1)])
     cova_y = np.diag(y_err**2)
