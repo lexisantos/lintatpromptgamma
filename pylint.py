@@ -306,7 +306,7 @@ def redondeo(mean, err, cs, texto = False):
     else:
         err_R = format(np.round(err, decimals = digits), '.0f')
         mean_R = format(np.round(mean, decimals = cs-1-len(err_R)), '.0f')
-    if texto == True:
+    if texto:
         return (mean_R, '±',err_R)
     else:
         return (float(mean_R), float(err_R))
