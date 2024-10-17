@@ -13,6 +13,7 @@ import copy
 from itertools import combinations
 from scipy.stats import chi2
 
+F_PotA = {'M2': 3.98e15, 'CIP': 3.006e11, 'M3': 2.138e16} #en W/A
 
 class data_sead:
     def __init__(self, path_SEAD, fecha_ensayo):
@@ -34,7 +35,7 @@ class data_sead:
         
     def select_steps(self, det):
         t = self.time 
-        i = self.CIC_Marcha(self, det)
+        i = self.CIC_Marcha(det)
         plt.figure(99)
         plt.plot(t, i, '.', label = str(det))
         # plt.plot(data_sead_time, data_sead['LOG M3'], '.', label = 'M3')
@@ -186,6 +187,29 @@ def sel_data(datalist, index):
             datalist[ii] = data[i:f]
     return datalist    
 
+def t_comparison(tcomp, tref, tolerance: float=0.5):
+    #desde dicts, con keys para cada potencia
+    indcomp_sel = []
+    indref_sel = []
+    for jj, t2 in enumerate(tref):
+        x = (tcomp - t2)*60
+        i_sel = np.where(abs(x)<=tolerance)[0]
+        if len(i_sel)!=0:
+            indref_sel.append(jj)
+            indcomp_sel.append(i_sel[0])
+    return indcomp_sel, indref_sel
+        
+def select_data(measured, data_table, tolerance, idx=0): 
+    rows, cols = len(measured), len(data_table.T)
+    data_sel = np.zeros((rows, cols-1))
+    for jj, en in enumerate(measured):
+        for ee in data_table:
+            x = en/ee[idx]
+            if 1-tolerance<x<1+tolerance:
+                data_sel[jj] = np.delete(ee, idx)
+    return data_sel
+    
+
 #%% Figures 
 
 def LINT_hist_step(self, pot_sel):
@@ -224,6 +248,35 @@ def figure_SEAD(datos_sead, marchas_list, yscale = 'log', nfig = 99):
     plt.show()
     return fig
 
+def fig_LINT_MX_tuple(LINT_counts, LINT_time, Current_M, Time_M, yscale = 'linear', power_sel = [], nfig = 98):
+    if power_sel != []:
+        Current_M = {x: Current_M[x] for x in power_sel}
+        LINT_counts = {x: LINT_counts[x] for x in power_sel}
+        LINT_time = {x: LINT_time[x] for x in power_sel}
+        Time_M = {x: Time_M[x] for x in power_sel}
+    fig = plt.figure(nfig)
+    plt.clf()
+    # i_sels = {}
+    totalcount_sel = np.array([])
+    totalcurrent_sel = np.array([])
+    totaltime_sel = np.array([])
+    for count, current, pot, tlint, tmarcha in zip(LINT_counts.values(), Current_M.values(), LINT_counts.keys(),
+                                                   LINT_time.values(), Time_M.values()):
+        icomp, iref = t_comparison(tlint, tmarcha)
+        # i_sels[pot] = i_sel  
+        plt.plot(current.to_numpy()[iref], count[icomp], '.', label = pot + 'W')
+        totalcurrent_sel = np.append(totalcurrent_sel, current.to_numpy()[iref])
+        totalcount_sel = np.append(totalcount_sel, count[icomp])
+        totaltime_sel = np.append(totaltime_sel, tmarcha[iref])
+    plt.ylabel('CPS')
+    plt.xlabel('Current [A]')
+    plt.yscale(yscale)
+    plt.legend()
+    plt.grid(ls='--')
+    fig.tight_layout()  
+    # fig.show()
+    return fig, totalcount_sel, totalcurrent_sel, totaltime_sel
+    
 def figure_LINT_err(LINT_t, LINT_counts, yscale = 'symlog', power_sel = [], nfig = 98):
     if power_sel != []:
         LINT_t = {x: LINT_t[x] for x in power_sel}
@@ -281,10 +334,10 @@ def figure_fit(xdata, ydata, yerror, fit_data, scale = 'log', i_sel = [], xerror
         print(report)
     plt.show()
 
-def fig_err(counts_std, counts, scale = 'log'):
+def fig_err(counts_std, counts, power_list, scale = 'log'):
     plt.figure()
-    for count, count_std in zip(counts, counts_std):
-        plt.plot(count_std, np.sqrt(count), 'o', label = str(round(count)))
+    for count, count_std, power in zip(counts, counts_std, power_list):
+        plt.plot(count_std, np.sqrt(count), 'o', label = f'{power}W')
     plt.legend()
     plt.ylabel('$\sqrt{Counts}$')
     plt.xlabel('$\sigma_{std}$')
@@ -306,7 +359,7 @@ def redondeo(mean, err, cs, texto = False):
     else:
         err_R = format(np.round(err, decimals = digits), '.0f')
         mean_R = format(np.round(mean, decimals = cs-1-len(err_R)), '.0f')
-    if texto:
+    if texto == True:
         return (mean_R, '±',err_R)
     else:
         return (float(mean_R), float(err_R))
