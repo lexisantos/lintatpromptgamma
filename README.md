@@ -1,6 +1,6 @@
 # LINTatPromptGamma
 
-_pylint_ es la librería con funciones útiles para analizar y graficar los datos devueltos por el SEAD y el software de adquisición del LINT. Se irá actualizando a medida que se necesiten nuevos métodos de análisis.
+`pylint.py` es la librería con funciones útiles para analizar y graficar los datos devueltos por el SEAD y el software de adquisición del LINT. Se irá actualizando a medida que se necesiten nuevos métodos de análisis.
 
 ## Acerca de
 Estos scripts son usados bajo el marco del proyecto LINT, cuyo objetivo es instalar y caracterizar un detector de neutrones térmicos en la columna del Prompt Gamma del RA-3. Los datos y resultados (si se encuentra visible, en `AnalisisLINT.ipynb`) se usarán para el desarrollo de mi tesis de Lic. en Física. 
