@@ -13,10 +13,28 @@ import copy
 from itertools import combinations
 from scipy.stats import chi2
 
-F_PotA = {'M2': 3.98e15, 'CIP': 3.006e11, 'M3': 2.138e16} #en W/A
+F_PotA = {'CIP': 3.006e11} #en W/A
 
 class data_sead:
     def __init__(self, path_SEAD, fecha_ensayo):
+        '''
+        Inicia clase con datos del SEAD.
+
+        Parameters
+        ----------
+        path_SEAD : str
+            Ruta del archivo .csv con los datos exportados.
+        fecha_ensayo : str
+            Fecha del ensayo, con formato '05Jul2024'.
+
+        Returns
+        -------
+        Agrega atribuciones:
+            - data: datos importados
+            - time: vector temporal en minutos, corregido a t_inicio
+            - t_inicio: tiempo de inicio en el vector t crudo
+            - fecha: fecha del ensayo
+        '''
         data_sead = pd.read_csv(path_SEAD, delimiter =',')
         data_sead['Hora'] = list(datetime.strptime(fecha_ensayo + '_'+ hora, '%d%b%Y_%H:%M:%S.%f') for hora in data_sead['Hora'])
         t_inicio_sead = data_sead['Hora'][0]
@@ -27,13 +45,54 @@ class data_sead:
         self.fecha = fecha_ensayo
     
     def copy(self):
+        '''
+        Genera una copia de la clase data_sead.
+
+        Returns
+        -------
+        class
+            Copia de data_sead con todos los atributos y datos generados hasta ese momento.
+
+        '''
         return copy.deepcopy(self)
     
-    def CIC_Marcha(self, det):
-        current = self.data['LOG {}'.format(str(det))]
+    def CIC_Marcha(self, det, idx: str='LOG'):
+        '''
+        Extrae de self.data la corriente o señal del detector seleccionado. Sirve más para CICs, Marchas, Arranques.
+
+        Parameters
+        ----------
+        det : str
+            Nombre del detector. Ej: 'M3', 'A1', 'BT3'.
+        idx : str (D = 'LOG')
+            Define la escala o id del detector. Ejemplos: 'LOG', 'LIN', 'MA', 'TSN', 'TASA'
+        
+        Returns
+        -------
+        current : Panda Series, float
+            Columna de self.data correspondiente.
+
+        '''
+        current = self.data['{} {}'.format(idx, str(det))]
         return current
         
-    def select_steps(self, det):
+    def select_steps(self, det, detalle: str=''):
+        '''
+        Elegir intervalos estables a partir del gráfico.
+
+        Parameters
+        ----------
+        det : str
+            Señal a cargar usando self.CIC_Marcha.
+        detalle : str, (D = '')
+            Detalles para la selección de pasos. Sólo se usa en el nombre.
+        Returns
+        -------
+        step_index : array, int
+            Devuelve una lista con los índices de ti y tf para cada escalón.
+        
+        También se guarda el array en un .txt, bajo el nombre 'step_t_min_{self.fecha}_{detalle}.txt'
+        '''
         t = self.time 
         i = self.CIC_Marcha(det)
         plt.figure(99)
@@ -48,11 +107,32 @@ class data_sead:
         plt.tight_layout()
         x = plt.ginput(n=-1, timeout=0)
         step_index = np.row_stack(np.split(np.array([xx[0] for xx in x]), len(x)//2))
-        np.savetxt(f'step_t_min_{self.fecha}_consubida.txt', step_index, delimiter='\t')
+        np.savetxt(f'step_t_min_{self.fecha}_{detalle}.txt', step_index, delimiter='\t')
         plt.close(99)
         return step_index
     
     def per_step(self, det, path_step = None, power_list = list(range(50))):
+        '''
+        En un dict, guarda las partes de la señal por escalón/intervalo, seleccionado por select_steps.
+
+        Parameters
+        ----------
+        det : str
+            Nombre del detector cuya señal se va a levantar con CIC_Marcha.
+        path_step : str (D = None)
+            Ruta de ubicación del .txt con los índices de los pasos. Si se deja vacío, abre el método select_steps
+        power_list : list (D = [0, 1, ..., 50]), str
+            Lista de nombres o etiquetas de los pasos/intervalos, que serán las keys o llaves de los diccionarios finales. 
+            Generalmente uso la potencia de cada escalón.
+
+        Returns
+        -------
+        time_step : dict
+            Devuelve un diccionario con el formato {potencia: array t del escalón}.
+        data_step : dict
+            Devuelve un diccionario con el formato {potencia: array señal (I) del escalón}.
+
+        '''
         try:
             step_times = np.loadtxt(path_step)
         except:
@@ -62,12 +142,33 @@ class data_sead:
 
         for jj, interval in enumerate(step_times):
             cond_sead = np.logical_and(self.time>interval[0], self.time<interval[1])
-            data_step[power_list[jj]] = self.CIC_Marcha(det)[cond_sead]
-            time_step[power_list[jj]] = self.time[cond_sead]
+            data_step[str(power_list[jj])] = self.CIC_Marcha(det)[cond_sead]
+            time_step[str(power_list[jj])] = self.time[cond_sead]
         return time_step, data_step
     
     
 def process_lint(path, t_inicio):
+    '''
+    Primer proceso de los datos crudos del LINT, adquiridos por graficarCampbell v1.0.0.0 (by Juan Alarcón)
+
+    Parameters
+    ----------
+    path : str
+        Define la ruta del archivo guardado por el LINT.
+    t_inicio : str
+        Tiempo inicial definido, por ejemplo, a partir de data_SEAD.t_inicio, o un Timestamp.
+        Ejemplo: Timestamp('2024-07-05 11:20:00.453000')
+
+    Returns
+    -------
+    time : array, float
+        Vector de tiempo, con origen en t_inicio.
+    counts : Series, int
+        Cuentas en una unidad de sample time.
+    cod : int
+        Código del programa relacionado con el tiempo de sampleo (por ej., 1: 0.1s, 10: 1s).
+
+    '''
     data_lint = pd.read_table(path, delimiter =';|\s+', header=None, engine = 'python')
     data_time = data_lint.get([x for x in range(6)])
     time = np.array([(datetime(*data_time.iloc[i].to_list()) - t_inicio).total_seconds() for i in range(len(data_time))])
@@ -78,6 +179,28 @@ def process_lint(path, t_inicio):
 
 class data_LINT:
     def __init__(self, path_LINT_list, path_step, t_inicio, save_data=False, power_list = False):
+        '''
+        Class para los datos del LINT. Al inicio, 
+
+        Parameters
+        ----------
+        path_LINT_list : list, str
+            Lista con las rutas de ubicación de los archivos .txt exportados del LINT.
+        path_step : str
+            Dirección en donde se encuentra el archivo con los ti, tf de los escalones.
+        t_inicio : str
+            Dado por data_sead.t_inicio, o en el formato de Timestamp.
+            Por ejemplo, Timestamp('2024-07-05 11:20:00.453000')
+        save_data : bpol (D = False)
+            ¿Desea guardar los datos? Si es True, se guardan los arrays de counts, time, cod 
+        power_list : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
+        '''
         step_times = np.loadtxt(path_step)
         if power_list:
             potencias = power_list
@@ -106,7 +229,20 @@ class data_LINT:
             np.save('counts_cond_conrampas.npy', counts_cond) 
             np.save('cod_Ts_conrampas.npy', cod_Ts)
             
-    def apply_corr(self, ncond=2):
+    def corr_rep(self, ncond=2):
+        '''
+        Si se adquiere en períodos menores a 1 s, convierte los datos a CPS.
+
+        Parameters
+        ----------
+        ncond : int (D = 2)
+            Cantidad mínima de repeticiones dentro del segundo. 
+
+        Returns
+        -------
+        Atributos counts_norep, time_norep: CPS y marcas de tiempo para cada segundo.
+
+        '''
         time_norep = {}
         counts_norep = {}
         for pot in iter(self.potencias):
@@ -132,7 +268,7 @@ class data_LINT:
             self.time_norep
             self.counts_norep
         except:
-            self.apply_corr()
+            self.corr_rep()
         time_deriva = {}
         counts_deriva = {}
         for pot in self.potencias:
@@ -154,8 +290,32 @@ class data_LINT:
                     continue
             time_deriva[pot] = np.delete(time_deriva[pot], 0, axis=0)
             counts_deriva[pot] = np.delete(counts_deriva[pot], 0, axis=0)
-        return time_deriva, counts_deriva
-        
+        return time_deriva, counts_deriva   
+    
+    def corr_nonpar(self, tdead):
+        '''
+        Non-paralizable detector correction.
+
+        Parameters
+        ----------
+        tdead : float
+            Tiempo muerto [s] característico del detector.
+
+        Returns
+        -------
+        Attribute 'counts_corr', dict
+
+        '''
+        m_corr = {}
+        try:
+            m = self.counts_norep
+        except:
+            self.corr_rep()
+            m = self.counts_norep
+        for pot in self.potencias:
+            m_corr[pot] = m[pot]/(1-m[pot]*tdead)
+        self.counts_corr = m_corr
+  
     def stable_interval(self, path_stable):
         stable_times = np.loadtxt(path_stable)
         potencias = self.potencias
@@ -255,7 +415,7 @@ def fig_LINT_MX_tuple(LINT_counts, LINT_time, Current_M, Time_M, yscale = 'linea
         LINT_time = {x: LINT_time[x] for x in power_sel}
         Time_M = {x: Time_M[x] for x in power_sel}
     fig = plt.figure(nfig)
-    plt.clf()
+    # plt.clf()
     # i_sels = {}
     totalcount_sel = np.array([])
     totalcurrent_sel = np.array([])
