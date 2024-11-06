@@ -147,7 +147,7 @@ class data_sead:
         return time_step, data_step
     
     
-def process_lint(path, t_inicio):
+def process_lint(path, t_inicio = pd.Timestamp.now(), conMarcha = True):
     '''
     Primer proceso de los datos crudos del LINT, adquiridos por graficarCampbell v1.0.0.0 (by Juan Alarcón)
 
@@ -155,7 +155,7 @@ def process_lint(path, t_inicio):
     ----------
     path : str
         Define la ruta del archivo guardado por el LINT.
-    t_inicio : str
+    t_inicio : str (D = Timestamp.now())
         Tiempo inicial definido, por ejemplo, a partir de data_SEAD.t_inicio, o un Timestamp.
         Ejemplo: Timestamp('2024-07-05 11:20:00.453000')
 
@@ -171,14 +171,17 @@ def process_lint(path, t_inicio):
     '''
     data_lint = pd.read_table(path, delimiter =';|\s+', header=None, engine = 'python')
     data_time = data_lint.get([x for x in range(6)])
-    time = np.array([(datetime(*data_time.iloc[i].to_list()) - t_inicio).total_seconds() for i in range(len(data_time))])
-    time = time/60
+    if conMarcha:
+        time = np.array([(datetime(*data_time.iloc[i].to_list()) - t_inicio).total_seconds() for i in range(len(data_time))])
+        time = time/60
+    else:
+        time = np.array([str(datetime(*data_time.iloc[i].to_list()).time())[0:8] for i in range(len(data_time))])
     counts = data_lint[6]
     cod = data_lint[7]
     return time, counts, cod
 
 class data_LINT:
-    def __init__(self, path_LINT_list, path_step, t_inicio, save_data=False, power_list = False):
+    def __init__(self, path_LINT_list, path_step = False, t_inicio = pd.Timestamp.now(), save_data=False, power_list = False):
         '''
         Class para los datos del LINT. Al inicio, 
 
@@ -186,9 +189,9 @@ class data_LINT:
         ----------
         path_LINT_list : list, str
             Lista con las rutas de ubicación de los archivos .txt exportados del LINT.
-        path_step : str
+        path_step : str, 
             Dirección en donde se encuentra el archivo con los ti, tf de los escalones.
-        t_inicio : str
+        t_inicio : str (D = Timestamp.now())
             Dado por data_sead.t_inicio, o en el formato de Timestamp.
             Por ejemplo, Timestamp('2024-07-05 11:20:00.453000')
         save_data : bpol (D = False)
@@ -201,25 +204,31 @@ class data_LINT:
         None.
 
         '''
-        step_times = np.loadtxt(path_step)
         if power_list:
             potencias = power_list
         else:
-            potencias = list(range(len(step_times)))
-        step_times = np.loadtxt(path_step)
+            potencias = list(range(len(path_LINT_list)))
         counts_cond = {ii:[] for ii in potencias}
         time_cond = {ii:[] for ii in potencias}
         cod_Ts = {ii:[] for ii in potencias}
-        for path in path_LINT_list:
-            time, counts, cod = process_lint(path, t_inicio)
-            for jj, interval in enumerate(step_times):
-                cond = np.logical_and(time>interval[0], time<interval[1])
-                if any(cond) == True:    
-                    counts_cond[potencias[jj]] += counts[cond].to_list()
-                    time_cond[potencias[jj]] = np.append(time_cond[potencias[jj]], time[cond])
-                    cod_Ts[potencias[jj]] += cod[cond].to_list()
-        for pot in potencias:
-            counts_cond[pot] = np.array(counts_cond[pot])
+        if path_step:
+            step_times = np.loadtxt(path_step)
+            for path in path_LINT_list:
+                time, counts, cod = process_lint(path, t_inicio)
+                for jj, interval in enumerate(step_times):
+                    cond = np.logical_and(time>interval[0], time<interval[1])
+                    if any(cond) == True:    
+                        counts_cond[potencias[jj]] += counts[cond].to_list()
+                        time_cond[potencias[jj]] = np.append(time_cond[potencias[jj]], time[cond])
+                        cod_Ts[potencias[jj]] += cod[cond].to_list()
+            for pot in potencias:
+                counts_cond[pot] = np.array(counts_cond[pot])
+        else:
+            for jj, path in enumerate(path_LINT_list):
+                time, counts, cod = process_lint(path, t_inicio, conMarcha = path_step)
+                counts_cond[potencias[jj]] = counts.to_list()
+                time_cond[potencias[jj]] = time
+                
         self.counts_cond = counts_cond
         self.time_cond = time_cond
         self.cod = cod_Ts
