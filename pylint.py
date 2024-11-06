@@ -322,6 +322,7 @@ class data_LINT:
             self.corr_rep()
             m = self.counts_norep
         for pot in self.potencias:
+            m[pot] = np.array(m[pot])
             m_corr[pot] = m[pot]/(1-m[pot]*tdead)
         self.counts_corr = m_corr
   
