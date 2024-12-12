@@ -29,20 +29,20 @@ class PulseCounter:
         global ser
         try:
             if ser.isOpen():
-                print(f"\n Serial in {ser.port} is open.")
+                print(f"\n Serial in {ser.port} is already Open. ")
             else:
                 print("\n Error: Serial is not Open. Opening...")
                 ser.open()
-                print(f"\n Serial in {ser.port} is now open.")
+                print(f"\n Serial in {ser.port} is now Open.")
         except:
             print('\n Please, verify connection.')
     
-    def Reader(self, filename = 'test_csv.csv', timeout: int=20, header = ['Date', 'Time', 't[s]', 'Counts']):
+    def Reader(self, filename = 'test_csv.csv', timeout: int=20, header = ['Date', 'PC_Timestamp', 't_LINT [s]', 'Counts']):
         read_arr = np.zeros((timeout, 2), dtype=int)
         with open(filename, 'w', newline='') as f:
             csv_file = csv.writer(f)
             csv_file.writerow(header)
-            ser.reset_input_buffer()
+            # ser.reset_input_buffer()
             read_arr[0] = np.array(ser.readline().decode("utf-8").split(';'), dtype=int) 
             t0 = read_arr[0, 0]
             read_arr[0, 0] = 0
@@ -54,10 +54,11 @@ class PulseCounter:
                 read_arr[n, 0] -= t0
                 linecsv = [*Timestamp().split(), *read_arr[n]]
                 csv_file.writerow(linecsv)
+                # print(*linecsv)
                 line1.set_xdata(read_arr[:n+1, 0])
                 line1.set_ydata(read_arr[:n+1, 1])
                 ax.set_xlim(read_arr[:n+1, 0].min(), read_arr[:n+1, 0].max())
-                # ax.set_ylim(min(read_arr[:n+1, 1]), max(read_arr[:n+1, 1]))
+                ax.set_ylim(read_arr[:n+1, 1].min(), read_arr[:n+1, 1].max())
                 fig.canvas.draw()
                 fig.canvas.flush_events()
                 n+=1
@@ -65,19 +66,26 @@ class PulseCounter:
         ser.reset_output_buffer()
         ser.close()
         print(f'\n Data saved in {os.getcwd()}{filename}')
-        
+     
+def run(title, N, puerto = 'COM3'):
+    global ax, fig, line1
+    global cp
+    plt.ion()
+    fig, ax = plt.subplots(figsize = (8,6))
+    ax.set_xlabel('t [s]')
+    ax.set_ylabel('Counts')
+    ax.grid(True, ls='--')
+    ax.ticklabel_format(useOffset = False)
+    
+    line1, = ax.plot([], [], "r.-")
+    
+    cp = PulseCounter(puerto) 
+    cp.Initialize()
+    cp.Reader(filename = title, timeout = N)
+
 Show_ports()
+#El LINT es USB VID:PID=0403:6015 SER=FTXW3XZ4A
 
 # %% 
 
-plt.ion()
-fig, ax = plt.subplots(figsize = (8,6))
-ax.set_xlabel('t [s]')
-ax.set_ylabel('Counts')
-
-line1, = ax.plot([], [], "r.-")
-
-cp = PulseCounter('COM3') 
-cp.Initialize()
-cp.Reader(filename = 'test4_csv.csv')
-                
+run('test13_genfun_13kHz.csv', N = 300)
