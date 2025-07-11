@@ -1,7 +1,7 @@
 # LINTatPromptGamma
 
-`pylint.py`:
-- Contiene funciones útiles para analizar y graficar los datos devueltos por el SEAD y el software de adquisición del LINT. 
+- `pylint.py`:
+Contiene funciones útiles para analizar y graficar los datos devueltos por el SEAD y el software de adquisición del LINT. 
 _It defines methods and classes, useful for processing, analizing and plotting the data (-.csv) from the Electronic Acquisition Data System at the RA-3 and the output (-.txt) from the Li detector._
 
 `LINT_pulsecounter.py`: 
