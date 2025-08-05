@@ -18,5 +18,5 @@ Resultados del ensayo de linealidad en el haz del PG. Se hizo una calibración c
 _Linearity study at the PG Facility Beam. Cross calibration made in comparison to other detectors from the reactor. Although the parameters returned by the model fit are not important, we rely on the goodness of fitness to verify linearity. It was observed that the LINT is able to follow the same tendencies as the other detectors -or in other words, the flux changes._
 
 ## Acerca de
-Estos scripts son usados bajo el marco del proyecto LINT, cuyo objetivo es instalar y caracterizar un detector de neutrones térmicos en la columna del Prompt Gamma del RA-3. Los resultados (en .ipynb) serán parte de mi tesis de Lic. en Física. 
-_These scripts are part of the LINT Project, a collaboration with the RA-3. The main purpose is to tune-up and install a thermal neutron detector at the Prompt Gamma Facility. The results (.ipynb) will be published in my final dissertation to get my BS. in Physics degree._
+Estos scripts son usados bajo el marco del proyecto LINT, cuyo objetivo es instalar y caracterizar un detector de neutrones térmicos en la columna del Prompt Gamma del RA-3. Los resultados (en .ipynb) serán publicados en un artículo (próximamente). 
+_These scripts are part of the LINT Project, a collaboration with the RA-3. The main purpose is to tune-up and install a thermal neutron detector at the Prompt Gamma Facility. The results (.ipynb) will be published in an article (coming soon)._
